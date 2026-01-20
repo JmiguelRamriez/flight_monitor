@@ -113,10 +113,17 @@ def run():
     logger.info("Evaluando ofertas...")
     notifications_sent = 0
     
+    # Tracking de la mejor alternativa global (Lowest Price Found)
+    best_alternative = None
+    
     # Ordenamos deals por precio para evaluar los mejores primero
     deals.sort(key=lambda x: x.get("price", float('inf')))
 
     for deal in deals:
+        # Track global best
+        if best_alternative is None or deal["price"] < best_alternative["price"]:
+            best_alternative = deal
+            
         result = scorer.evaluate_deal(deal)
         
         if result.is_deal:
@@ -143,6 +150,15 @@ def run():
         else:
             # Logging verbose o para debug
             pass
+
+    # 8. Reporte de Ejecución (Si no hubo ofertas)
+    if notifications_sent == 0 and config["system"].get("send_summary_if_no_deals", True):
+        logger.info("No se encontraron ofertas. Enviando resumen de ejecución...")
+        stats = {
+            "routes_checked": len(min_prices_map), # Approx routes checked
+            "best_deal": best_alternative
+        }
+        notifier.send_summary(stats)
 
     logger.info(f"Ejecución finalizada. Notificaciones enviadas: {notifications_sent}")
 
