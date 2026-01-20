@@ -1,24 +1,35 @@
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Virtual environments
 venv/
+.venv/
+env/
+
+# Environment variables
 .env
-.env.local
+.env.*
+!.env.example
 
 # IDEs
 .vscode/
 .idea/
 
-# Logs
+# Logs / debug
 *.log
 debug_output.txt
 
-# Config
-# config.yaml should be committed as a template, but if it contains personal info consider ignoring it.
-# For now we keep it tracked as it holds logic, but user should be careful.
+# Databases / local data
+*.db
+*.sqlite
+*.sqlite3
+
+# Config files
+config.yaml
 
 # OS
 Thumbs.db
 Desktop.ini
+.DS_Store
