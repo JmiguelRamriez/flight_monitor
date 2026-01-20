@@ -35,7 +35,11 @@ class RedirectHandler(logging.Handler):
                 if len(parts) > 1:
                     pct_str = parts[1].strip().replace("%", "")
                     value = float(pct_str) / 100.0
-                    self.progress_bar.set(value)
+                    
+                    # CORRECCIÓN: Actualizar la GUI desde el hilo principal
+                    def update_prog():
+                        self.progress_bar.set(value)
+                    self.text_widget.after(0, update_prog)
             except:
                 pass # Ignore parsing errors
 

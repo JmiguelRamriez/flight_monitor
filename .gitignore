@@ -1,0 +1,24 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+
+# Logs
+*.log
+debug_output.txt
+
+# Config
+# config.yaml should be committed as a template, but if it contains personal info consider ignoring it.
+# For now we keep it tracked as it holds logic, but user should be careful.
+
+# OS
+Thumbs.db
+Desktop.ini

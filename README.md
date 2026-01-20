@@ -1,75 +1,72 @@
-# Flight Deal Monitor ✈️
 
-A configuration-driven, robust flight monitoring system powered by Python and the **Amadeus Self-Service API**. Designed to detect round-trip flight deals based on historical baseline prices and flexible user constraints.
+# ✈️ Flight Deal Monitor
 
-## Features
+Un sistema inteligente en Python que monitorea precios de vuelos utilizando la API de Amadeus y notifica vía WhatsApp (Twilio) cuando encuentra ofertas que cumplen tus criterios o te envía un resumen diario con la mejor opción disponible.
 
-- **Configuration-First**: All parameters (destinations, dates, budgets, thresholds) are managed in `config.yaml`.
-- **Smart Scoring**: Uses a statistics-based approach (median filtering) to identify real deals (10-25% discount).
-- **Cold Start Protection**: Safely handles routes with no history by building baselines on the fly while enforcing strict budgets.
-- **Deduplication**: Prevents spamming deeply checks if specific itineraries have already been notified.
-- **WhatsApp Alerts**: Instant notifications via Twilio.
+## ✨ Características
 
-## Setup
+- **Búsqueda Automatizada**: Escanea múltiples fechas y aeropuertos automáticamente.
+- **Lógica de "Gangas"**: Filtra ofertas basándose en un precio máximo y un descuento relativo estacional.
+- **Interfaz Gráfica (GUI)**:
+  - Lanzador moderno con modo oscuro.
+  - Configuración fácil de origen, destino, fechas y presupuesto.
+  - **Barra de Progreso** en tiempo real.
+  - Consola de logs integrada.
+- **Notificaciones Inteligentes**:
+  - Alerta inmediata si encuentra una oferta por debajo de tu presupuesto.
+  - **Resumen Diario**: Si no hay ofertas, te avisa que terminó y te muestra la "Mejor Alternativa" encontrada.
+  - **Links Directos**: Incluye enlaces a Google Flights para reservar rápidamente.
+- **Multi-Hilo**: La interfaz no se congela mientras busca.
 
-### Prerequisites
-- Python 3.11+
-- **Amadeus Self-Service API Credentials** (Client ID & Secret).
-- Twilio Account (SID, Token, WhatsApp Sandbox/Sender).
+## 🚀 Instalación
 
-### Installation
-
-1. Install dependencies:
+1. **Clonar el repositorio**:
    ```bash
-   pip install requests python-dotenv PyYAML
-   ```
-   *(Note: `sqlite3` is included in Python standard library)*
-
-2. Configure Environment:
-   Copy `.env.example` to `.env` and fill in your credentials.
-   ```bash
-   cp .env.example .env
-   # Add AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET
+   git clone https://github.com/tu-usuario/flight_monitor.git
+   cd flight_monitor
    ```
 
-3. Configure Logic:
-   Edit `config.yaml` to set your travel preferences.
+2. **Instalar dependencias**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+   *(Si no existe requirements.txt, las principales son: `requests`, `pyyaml`, `python-dotenv`, `customtkinter`)*
 
-## Usage
+3. **Configurar Credenciales (.env)**:
+   Crea un archivo `.env` en la raíz con tus claves API:
+   ```env
+   AMADEUS_CLIENT_ID=tu_client_id
+   AMADEUS_CLIENT_SECRET=tu_client_secret
+   TWILIO_ACCOUNT_SID=tu_sid
+   TWILIO_AUTH_TOKEN=tu_token
+   TWILIO_FROM_NUMBER=whatsapp:+14155238886
+   ```
 
-Run the script manually or via cron/scheduler:
+## ⚙️ Configuración (config.yaml)
+
+El archivo `config.yaml` controla toda la lógica (presupuesto, filtros, fechas). 
+**¡Pero no necesitas editarlo manualmente!** Usa la GUI para cambiar lo más importante:
+- Origen / Destino
+- Ventana de fechas
+- Presupuesto Máximo
+
+## 🖥️ Uso
+
+Simplemente ejecuta el lanzador:
 
 ```bash
-python main.py
+python gui_launcher.py
 ```
 
-### Amadeus API Limitations
-- **Date Search**: Unlike the previous Tequila backend, Amadeus does not natively search "All dates in a 3 month window" in a single call.
-- **Strategy**: The script now intelligently iterates through random dates within your configured window during each run, respecting `max_queries_per_run`. Run the script frequently (e.g. hourly) to cover more date combinations over time.
-- **Deep Links**: Amadeus does not provide direct booking links (Deep Links). The notification will contain the deal details but no clickable purchase link.
+1. Ajusta tus preferencias en el panel izquierdo.
+2. Marca **"Enable Daily Summary"** si quieres recibir reporte aunque no haya gangas.
+3. Presiona **"RUN SEARCH"**.
+4. Observa el progreso y espera tu WhatsApp. 📲
 
-### Config Guide (`config.yaml`)
+## 📋 Requisitos de API
 
-This file controls the entire behavior. Key sections:
-- `travel`: Origin/Destination countries.
-- `dates`: Window of search (e.g. next 30-150 days).
-- `filters`: Stopovers, airlines, baggage.
-- `budget`: Max absolute price.
-- `scoring`: Statistical rules for defining a "deal".
+- **Amadeus for Developers**: Crear cuenta y app para obtener Keys (Entorno Test o Production).
+- **Twilio**: Cuenta con WhatsApp Sandbox activado. (Recuerda enviar el código `join ...` a tu número de Sandbox cada 3 días).
 
-*(Nota: Los comentarios dentro de `config.yaml` están en español para facilitar la configuración)*
-
-## Data Logic
-
-### Baseline & Scoring
-The system calculates a historical baseline (Median P50) for every Route + Month pair.
-- **Normal Operation**: Matches if price is 10%-25% below baseline.
-- **Cold Start**: If historical samples < `min_samples` (default 5):
-  - Uses strictly available data.
-  - **MUST** be below `budget.max_price`.
-  - Notifications are tagged as `LOW CONFIDENCE`.
-
-### Persistence
-- `deals.db` (SQLite) stores:
-  - `price_history`: Simplified price samples for baseline calc.
-  - `notifications`: Hash of sent deals to prevent duplicates.
+---
+Hecho con 🐍 Python.
