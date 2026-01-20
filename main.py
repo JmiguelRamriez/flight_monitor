@@ -144,6 +144,7 @@ def run():
 
             if should_notify:
                 logger.info(f"!!! DEAL ENCONTRADO !!! {deal['cityCodeTo']} por {deal['price']} (Conf: {result.confidence})")
+                logger.info(f"Link: {deal.get('deep_link', 'N/A')}")
                 notifier.send_deal_alert(deal, result)
                 store.record_notification(result.deal_hash, deal["price"])
                 notifications_sent += 1
@@ -151,13 +152,19 @@ def run():
             # Logging verbose o para debug
             pass
 
+    # Siempre mostrar la mejor alternativa en consola si existe
+    if best_alternative:
+        logger.info(f"🔎 Mejor opción encontrada: {best_alternative.get('cityCodeTo')} - ${best_alternative.get('price')}")
+        logger.info(f"🔗 Google Flights: {best_alternative.get('deep_link', 'N/A')}")
+        logger.info(f"✈️ Skyscanner:    {best_alternative.get('backup_link', 'N/A')}")
+
     # 8. Reporte de Ejecución (Si no hubo ofertas)
     if notifications_sent == 0 and config["system"].get("send_summary_if_no_deals", True):
         logger.info("No se encontraron ofertas. Enviando resumen de ejecución...")
         stats = {
             "routes_checked": len(min_prices_map), # Approx routes checked
             "best_deal": best_alternative
-        }
+        }  
         notifier.send_summary(stats)
 
     logger.info(f"Ejecución finalizada. Notificaciones enviadas: {notifications_sent}")

@@ -310,14 +310,27 @@ class AmadeusClient:
                 # Combinamos segmentos de ida y vuelta
                 all_segments = outbound + inbound
                 
-                # Generar link de Google Flights
-                # Formato consulta: https://www.google.com/travel/flights?q=MEX+to+GYE+on+2026-06-27+returning+2026-07-10
+                # Generar link de Google Flights (Query más explícita)
                 dep_date_str = dt_obj.strftime("%Y-%m-%d")
-                ret_date_str = ""
-                if inbound:
-                    ret_date_str = f"+returning+{rt_obj.strftime('%Y-%m-%d')}"
                 
-                g_flights_link = f"https://www.google.com/travel/flights?q={origin_code}+to+{dest_code}+on+{dep_date_str}{ret_date_str}"
+                # Google Flights: "Flights from ORIGIN to DEST on DATE returning DATE"
+                gf_query = f"Flights from {origin_code} to {dest_code} on {dep_date_str}"
+                
+                # Skyscanner: https://www.skyscanner.com/transport/flights/mex/gye/240501/240510
+                # Skyscanner format uses YYMMDD
+                sky_dep = dt_obj.strftime("%y%m%d")
+                sky_ret = ""
+                
+                if inbound:
+                    rt_obj = datetime.strptime(inbound[0]['departure']['at'], "%Y-%m-%dT%H:%M:%S")
+                    ret_str = rt_obj.strftime("%Y-%m-%d")
+                    gf_query += f" returning {ret_str}"
+                    
+                    sky_ret = rt_obj.strftime("%y%m%d")
+                
+                # Construir URLs
+                gf_link = f"https://www.google.com/travel/flights?q={gf_query.replace(' ', '+')}"
+                sky_link = f"https://www.skyscanner.com.mx/transport/vuelos/{origin_code.lower()}/{dest_code.lower()}/{sky_dep}/{sky_ret}"
 
                 deal_dict = {
                     "price": price,
@@ -325,9 +338,10 @@ class AmadeusClient:
                     "cityCodeTo": dest_code,
                     "dTime": int(d_time_ts),
                     "aTime": int(a_time_ts),
-                    "route": all_segments, # Para contar stopovers
+                    "route": all_segments, 
                     "airlines": airlines,
-                    "deep_link": g_flights_link, 
+                    "deep_link": gf_link,
+                    "backup_link": sky_link,
                     "source": "amadeus"
                 }
                 
