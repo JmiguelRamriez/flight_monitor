@@ -1,60 +1,34 @@
-# Configuración del Sistema de Monitoreo de Vuelos
-# Este archivo es la ÚNICA fuente de verdad para la lógica de negocio.
-
-travel:
-  # Código ISO del país de origen (ej. MX, US, CA)
-  origin_country: "MX"
-  # Código ISO del país destino (ej. JP, FR, IT)
-  destination_country: "JP"
-  # Límite de aeropuertos top a buscar en el destino para controlar rate limits
-  destination_airports_limit: 6
-
+budget:
+  currency: MXN
+  max_price: 15500
 dates:
-  # Días desde hoy para iniciar la búsqueda (ventana de viaje)
-  travel_window_start: 30
-  # Días desde hoy para finalizar la ventana de viaje
-  travel_window_end: 150
-  # Mínimo de noches de estancia
-  min_nights: 7
-  # Máximo de noches de estancia
   max_nights: 14
-
+  min_nights: 7
+  travel_window_end: 192
+  travel_window_start: 150
 filters:
-  max_stopovers: 2
+  airlines:
+    allowed: []
+    blocked:
+    - FR
+    - NK
   baggage:
     require_carry_on: true
     require_checked_bag: false
-  airlines:
-    # Lista de códigos IATA permitidos (vacío = todos)
-    allowed: []
-    # Lista de códigos IATA bloqueados
-    blocked: 
-      - "FR" # Ryanair
-      - "NK" # Spirit
-
-budget:
-  # Presupuesto máximo absoluto. Si es precio > esto, NUNCA notificar (incluso en cold start)
-  max_price: 25000
-  currency: "MXN"
-
+  max_stopovers: 2
 scoring:
-  # Días hacia atrás para calcular la mediana histórica (baseline)
   baseline_days: 60
-  # Mínimo de muestras para considerar el baseline "confiable"
-  min_samples: 5
-  # Descuento mínimo requerido vs baseline (0.10 = 10%)
-  discount_min: 0.10
-  # Descuento máximo "razonable" (0.25 = 25%). Deals mayores a esto son válidos pero raros.
-  discount_max: 0.25
-  # Porcentaje de caída de precio requerido para re-notificar una misma oferta
   dedupe_drop_pct: 0.05
-
+  discount_max: 0.25
+  discount_min: 0.1
+  min_samples: 5
 system:
-  # Máximo de peticiones a la API por ejecución del script
   max_queries_per_run: 20
-  # Segundos de espera entre peticiones para evitar 429
+  recipient_phone: '+5214422734972'
+  send_summary_if_no_deals: true
   sleep_seconds_between_requests: 2
-  # Número de WhatsApp destino (formato E.164)
-  recipient_phone: "+5214422734972"
-  # Usar datos simulados si no hay API Key (True/False)
-  use_mock_api: true
+  use_mock_api: false
+travel:
+  destination_airports_limit: 6
+  destination_country: GYE
+  origin_country: MEX

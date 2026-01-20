@@ -21,7 +21,7 @@ class AmadeusClient:
     # Amadeus Self-Service Test environment tiene data limitada.
     # Usaré el host de producción si es posible, pero requiere credenciales de prod.
     # Dejaré el base url como variable de clase fácil de cambiar.
-    HOST = "https://api.amadeus.com" 
+    HOST = "https://test.api.amadeus.com" 
 
     def __init__(self, client_id: str, client_secret: str, config: Dict[str, Any]):
         self.client_id = client_id
@@ -78,31 +78,34 @@ class AmadeusClient:
         # Mejor opción: parameters: countryCode={country_code} & subType=AIRPORT
         
         params = {
-            "countryCode": country_code,
+            "keyword": country_code,
             "subType": "AIRPORT",
             "view": "LIGHT",
-            "page[limit]": limit,
-            "sort": "analytics.travelers.score" # Ordenar por popularidad (requiere acceso a analytics a veces)
-            # Si 'sort' falla por permisos, usaremos default.
+            "page[limit]": limit
         }
         
-        # Nota: 'sort' por score suele fallar en tiers básicos. Si falla 400/403, reintentamos sin sort.
         try:
             response = self.session.get(endpoint, headers=self.get_headers(), params=params)
-            # Si user no tiene acceso a sort, podría fallar.
-            if response.status_code in [400, 403]:
-                params.pop("sort", None)
-                response = self.session.get(endpoint, headers=self.get_headers(), params=params)
+            # Retry logic for sort removed as we removed sort param due to permissions
                 
             response.raise_for_status()
             data = response.json().get('data', [])
             
             airports = [loc['iataCode'] for loc in data if 'iataCode' in loc]
+            
+            # Fallback: Si no devuelve nada y el input parece un código IATA (3 letras), lo usamos directo.
+            if not airports and len(country_code) == 3:
+                logger.info(f"Usando '{country_code}' directamente como destino.")
+                return [country_code]
+                
             logger.info(f"Aeropuertos encontrados para {country_code}: {airports}")
             return airports[:limit]
 
         except requests.RequestException as e:
             logger.error(f"Error obteniendo aeropuertos Amadeus: {e}")
+            # Fallback en excepción también
+            if len(country_code) == 3:
+                return [country_code]
             return []
 
     def _generate_mock_deals(self, origin: str, dest_airports: List[str]) -> List[Dict[str, Any]]:
@@ -185,9 +188,15 @@ class AmadeusClient:
         # Intentamos distribuir las queries entre los destinos
         # Si hay 3 destinos y 20 queries -> ~6 queries por destino.
         queries_per_dest = max(1, max_queries // len(dest_airports))
+        total_queries = queries_per_dest * len(dest_airports)
+        current_query = 0
         
         for dest in dest_airports:
             for _ in range(queries_per_dest):
+                current_query += 1
+                progress_pct = (current_query / total_queries) * 100
+                logger.info(f"[PROGRESS] {progress_pct:.0f}%")
+
                 # Elegir día random de salida
                 rand_day = random.randint(start_delta, end_delta)
                 depart_date = today + timedelta(days=rand_day)
@@ -233,7 +242,7 @@ class AmadeusClient:
                         
                     response.raise_for_status()
                     data = response.json().get('data', [])
-                    
+
                     # Normalizar resultados
                     normalized = self._normalize_results(data)
                     deals.extend(normalized)
@@ -286,8 +295,11 @@ class AmadeusClient:
                 dest_code = last_seg['arrival']['iataCode']
                 
                 # 4. Aerolíneas
-                airlines = list(set([o['carrierCode'] for o in offer.get('validatingAirlineCodes', [])]))
-                if not airlines:
+                # validatingAirlineCodes suele ser lista de strings ['AA', 'UA']
+                val_airlines = offer.get('validatingAirlineCodes', [])
+                if val_airlines:
+                     airlines = list(set(val_airlines))
+                else:
                     # Fallback a segmentos
                     airlines = list(set([s['carrierCode'] for s in outbound]))
 
@@ -298,6 +310,15 @@ class AmadeusClient:
                 # Combinamos segmentos de ida y vuelta
                 all_segments = outbound + inbound
                 
+                # Generar link de Google Flights
+                # Formato consulta: https://www.google.com/travel/flights?q=MEX+to+GYE+on+2026-06-27+returning+2026-07-10
+                dep_date_str = dt_obj.strftime("%Y-%m-%d")
+                ret_date_str = ""
+                if inbound:
+                    ret_date_str = f"+returning+{rt_obj.strftime('%Y-%m-%d')}"
+                
+                g_flights_link = f"https://www.google.com/travel/flights?q={origin_code}+to+{dest_code}+on+{dep_date_str}{ret_date_str}"
+
                 deal_dict = {
                     "price": price,
                     "cityCodeFrom": origin_code,
@@ -306,7 +327,7 @@ class AmadeusClient:
                     "aTime": int(a_time_ts),
                     "route": all_segments, # Para contar stopovers
                     "airlines": airlines,
-                    "deep_link": "", # No disponible
+                    "deep_link": g_flights_link, 
                     "source": "amadeus"
                 }
                 
