@@ -1,11 +1,11 @@
 budget:
   currency: MXN
-  max_price: 15500
+  max_price: 13000
 dates:
   max_nights: 14
   min_nights: 7
   travel_window_end: 192
-  travel_window_start: 150
+  travel_window_start: 161
 filters:
   airlines:
     allowed: []
