@@ -112,6 +112,7 @@ def run():
     # 7. Evaluar Ofertas Individuales (Scoring & Notificación)
     logger.info("Evaluando ofertas...")
     notifications_sent = 0
+    found_deals = []
     
     # Tracking de la mejor alternativa global (Lowest Price Found)
     best_alternative = None
@@ -148,6 +149,7 @@ def run():
                 notifier.send_deal_alert(deal, result)
                 store.record_notification(result.deal_hash, deal["price"])
                 notifications_sent += 1
+                found_deals.append(deal)
         else:
             # Logging verbose o para debug
             pass
@@ -168,6 +170,12 @@ def run():
         notifier.send_summary(stats)
 
     logger.info(f"Ejecución finalizada. Notificaciones enviadas: {notifications_sent}")
+    
+    return {
+        "notifications_sent": notifications_sent,
+        "deals": found_deals,
+        "best_alternative": best_alternative
+    }
 
 if __name__ == "__main__":
     try:

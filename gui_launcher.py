@@ -7,6 +7,7 @@ import threading
 import logging
 import sys
 import os
+import random # Importar random
 from datetime import datetime, timedelta
 from tkinter import messagebox
 import main
@@ -19,13 +20,11 @@ class RedirectHandler(logging.Handler):
     """
     Handler de logging personalizado.
     - Redirige todo a 'console_box'.
-    - Filtra resultados clave a 'results_box'.
     - Detecta [PROGRESS] para 'progress_bar'.
     """
-    def __init__(self, console_widget, results_widget, progress_bar=None):
+    def __init__(self, console_widget, progress_bar=None):
         super().__init__()
         self.console_widget = console_widget
-        self.results_widget = results_widget
         self.progress_bar = progress_bar
 
     def emit(self, record):
@@ -51,18 +50,114 @@ class RedirectHandler(logging.Handler):
             self.console_widget.see("end")
             self.console_widget.configure(state="disabled")
         self.console_widget.after(0, append_console)
-        
-        # 3. Filter for Results Box
-        # Keywords to identify results
-        keywords = ["DEAL ENCONTRADO", "Mejor opción", "Link:", "Google Flights:", "Skyscanner:"]
-        if any(k in msg for k in keywords):
-            def append_results():
-                self.results_widget.configure(state="normal")
-                self.results_widget.insert("end", msg + "\n\n") # Extra spacing
-                self.results_widget.see("end")
-                self.results_widget.configure(state="disabled")
-            self.results_widget.after(0, append_results)
 
+# ... (omitted code) ...
+
+    def setup_logging(self):
+        # Pasar solo console_box y progress_bar al handler
+        handler = RedirectHandler(self.console_box, self.progress_bar)
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+        logging.getLogger().addHandler(handler)
+
+
+class DealResultsWindow(ctk.CTkToplevel):
+    def __init__(self, deals):
+        super().__init__()
+        self.title("Offers Found! ✈️")
+        self.geometry("550x650") 
+        self.attributes("-topmost", True)
+        
+        # Header Banner
+        header = ctk.CTkFrame(self, fg_color="#0f172a", corner_radius=0)
+        header.pack(fill="x")
+        ctk.CTkLabel(header, text="✨ Result Deals ✨", font=ctk.CTkFont(size=24, weight="bold"), text_color="#facc15").pack(pady=15)
+        
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        deals.sort(key=lambda x: x.get("price", 0)) # Sort by price
+
+        for i, deal in enumerate(deals):
+            is_best = (i == 0)
+            self._create_deal_card(scroll, deal, is_best)
+            
+    def _create_deal_card(self, parent, deal, is_best):
+        # Card container with border
+        border_color = "#eab308" if is_best else "#4b5563"
+        border_width = 2 if is_best else 1
+        bg_color = "#1e293b"
+        
+        card = ctk.CTkFrame(parent, fg_color=bg_color, border_color=border_color, border_width=border_width)
+        card.pack(fill="x", pady=8, padx=5)
+        
+        # Best Deal Badge
+        if is_best:
+            badge = ctk.CTkLabel(card, text="⭐ BEST DEAL", fg_color="#eab308", text_color="black", corner_radius=6, font=ctk.CTkFont(size=10, weight="bold"))
+            badge.pack(anchor="e", padx=10, pady=(5,0))
+
+        # Header: Route
+        route_str = f"{deal.get('cityCodeFrom')} ✈️ {deal.get('cityCodeTo')}"
+        ctk.CTkLabel(card, text=route_str, font=ctk.CTkFont(size=18, weight="bold"), text_color="white").pack(anchor="w", padx=15, pady=(5,0))
+        
+        # Grid Info
+        info_frame = ctk.CTkFrame(card, fg_color="transparent")
+        info_frame.pack(fill="x", padx=15, pady=5)
+        
+        price = deal.get("price")
+        ts = deal.get("dTime")
+        date_str = datetime.fromtimestamp(ts).strftime('%d %b %Y') if ts else "N/A"
+        
+        # Price (Large)
+        ctk.CTkLabel(info_frame, text=f"${price:,}", font=ctk.CTkFont(size=24, weight="bold"), text_color="#4ade80").pack(side="left")
+        
+        # Date & Airline (Right)
+        right_info = ctk.CTkFrame(info_frame, fg_color="transparent")
+        right_info.pack(side="right")
+        ctk.CTkLabel(right_info, text=f"📅 {date_str}", font=ctk.CTkFont(size=14)).pack(anchor="e")
+        airlines = ", ".join(deal.get("airlines", []))[:20] # Truncate if long
+        ctk.CTkLabel(right_info, text=f"🛩️ {airlines}", font=ctk.CTkFont(size=12, text_color="gray")).pack(anchor="e")
+
+        # Button Logic: Try to use existing link, or regenerate it if missing
+        link = deal.get("deep_link") or deal.get("backup_link")
+        
+        if not link and deal.get("cityCodeFrom") and deal.get("cityCodeTo") and deal.get("dTime"):
+            # Fallback: Regenerate Google Flights Link
+            try:
+                origin = deal["cityCodeFrom"]
+                dest = deal["cityCodeTo"]
+                dep_dt = datetime.fromtimestamp(deal["dTime"])
+                dep_str = dep_dt.strftime("%Y-%m-%d")
+                
+                query = f"Flights from {origin} to {dest} on {dep_str}"
+                
+                # Check for return
+                if deal.get("aTime") and deal["aTime"] > deal["dTime"]:
+                     ret_dt = datetime.fromtimestamp(deal["aTime"])
+                     # Basic check to ensure it's a reasonable return date (e.g. not same day/weird)
+                     if ret_dt > dep_dt:
+                        ret_str = ret_dt.strftime("%Y-%m-%d")
+                        query += f" returning {ret_str}"
+                
+                link = f"https://www.google.com/travel/flights?q={query.replace(' ', '+')}"
+            except Exception:
+                link = None
+
+        if link:
+             btn_text = "Ver Oferta en Google Flights ↗️"
+             state = "normal"
+        else:
+             btn_text = "Ver Oferta (Link no disp.)"
+             state = "disabled"
+             
+        btn = ctk.CTkButton(card, text=btn_text, fg_color="#2563eb", hover_color="#1d4ed8", 
+                            font=ctk.CTkFont(weight="bold"),
+                            state=state,
+                            command=lambda l=link: self._open_link(l) if l else None)
+        btn.pack(fill="x", padx=15, pady=(10, 15))
+            
+    def _open_link(self, url):
+        import webbrowser
+        webbrowser.open(url)
 
 class FlightMonitorGUI(ctk.CTk):
     """
@@ -187,11 +282,10 @@ class FlightMonitorGUI(ctk.CTk):
         self.save_config(show_msg=True)
 
     def _create_left_panel(self):
-        self.left_frame = ctk.CTkFrame(self)
+        self.left_frame = ctk.CTkScrollableFrame(self, label_text="Configuration", label_font=ctk.CTkFont(size=20, weight="bold"))
         self.left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
-        label_title = ctk.CTkLabel(self.left_frame, text="Configuration", font=ctk.CTkFont(size=20, weight="bold"))
-        label_title.pack(pady=10)
+        # label_title removed as it's now part of the frame header
 
         self._create_section_label("Travel Settings")
         
@@ -276,9 +370,27 @@ class FlightMonitorGUI(ctk.CTk):
         self.frame_results = ctk.CTkFrame(self.right_frame)
         self.frame_results.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         
-        ctk.CTkLabel(self.frame_results, text="🔎 Found Deals / Results", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=5)
-        self.results_box = ctk.CTkTextbox(self.frame_results, state="disabled", font=("Consolas", 12))
-        self.results_box.pack(fill="both", expand=True, padx=5, pady=5)
+        ctk.CTkLabel(self.frame_results, text="🔎 Search Status & Animation", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=5)
+        
+        # Canvas para animación (Sky Blue-ish dark background)
+        self.anim_canvas = tk.Canvas(self.frame_results, bg="#1e293b", highlightthickness=0)
+        self.anim_canvas.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        self.clouds = []
+        # Create initial clouds at random positions
+        for _ in range(4):
+            x = random.randint(0, 400)
+            y = random.randint(10, 100)
+            cloud_id = self.anim_canvas.create_text(x, y, text="☁️", font=("Arial", random.randint(30, 50)), fill="#64748b")
+            speed = random.uniform(1.0, 3.0)
+            self.clouds.append({"id": cloud_id, "speed": speed})
+
+        # Plane
+        self.plane_id = self.anim_canvas.create_text(-60, 140, text="✈️", font=("Arial", 64), fill="white")
+        self.anim_running = False
+        
+        # Status Text centered
+        self.status_text = self.anim_canvas.create_text(250, 250, text="Ready for takeoff...", font=("Arial", 14, "italic"), fill="#94a3b8")
 
         # 2. Logs Section (Bottom)
         self.frame_logs = ctk.CTkFrame(self.right_frame)
@@ -294,6 +406,37 @@ class FlightMonitorGUI(ctk.CTk):
 
         self.console_box = ctk.CTkTextbox(self.frame_logs, state="disabled", font=("Consolas", 10))
         self.console_box.pack(fill="both", expand=True, padx=5, pady=5)
+
+    def _start_animation(self):
+        self.anim_running = True
+        self.anim_canvas.itemconfig(self.status_text, text="Searching active... Have a nice flight! 🌎", fill="#38bdf8")
+        self._animate_loop()
+
+    def _stop_animation(self):
+        self.anim_running = False
+        self.anim_canvas.itemconfig(self.status_text, text="Arrived! Check the results window.", fill="#4ade80")
+
+    def _animate_loop(self):
+        if not self.anim_running:
+            return
+            
+        w = self.anim_canvas.winfo_width()
+        
+        # 1. Move Clouds (Parallax - move left)
+        for cloud in self.clouds:
+            self.anim_canvas.move(cloud["id"], -cloud["speed"], 0)
+            pos = self.anim_canvas.coords(cloud["id"])
+            if pos[0] < -50: # Reset to right side
+                new_y = random.randint(10, 120)
+                self.anim_canvas.coords(cloud["id"], w + 50, new_y)
+                
+        # 2. Move Plane (Right)
+        self.anim_canvas.move(self.plane_id, 6, 0)
+        plane_pos = self.anim_canvas.coords(self.plane_id)
+        if plane_pos[0] > w + 60:
+             self.anim_canvas.coords(self.plane_id, -60, 140)
+             
+        self.after(30, self._animate_loop)
 
     def _create_section_label(self, text):
         l = ctk.CTkLabel(self.left_frame, text=text, font=ctk.CTkFont(size=14, weight="bold"))
@@ -360,8 +503,8 @@ class FlightMonitorGUI(ctk.CTk):
         self.budget_label_ref.configure(text=f"Max Budget: {int(value)}")
 
     def setup_logging(self):
-        # Pasar ambos widgets al handler
-        handler = RedirectHandler(self.console_box, self.results_box, self.progress_bar)
+        # Pasar solo console_box y progress_bar al handler
+        handler = RedirectHandler(self.console_box, self.progress_bar)
         handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
         logging.getLogger().addHandler(handler)
 
@@ -377,14 +520,11 @@ class FlightMonitorGUI(ctk.CTk):
         except:
             return 
         
-        # Limpiar resultados anteriores
-        self.results_box.configure(state="normal")
-        self.results_box.delete("0.0", "end")
-        self.results_box.configure(state="disabled")
-
         self.btn_run.configure(state="disabled", text="Running...")
         self.log_message("Starting search process...")
         self.progress_bar.set(0)
+        
+        self._start_animation() # START
         
         t = threading.Thread(target=self._run_main_logic)
         t.start()
@@ -392,12 +532,30 @@ class FlightMonitorGUI(ctk.CTk):
 
     def _run_main_logic(self):
         try:
-            main.run()
+            results = main.run()
             self.log_message("Process finished successfully.")
+            
+            # Show results window if deals found OR fallback to best alternative
+            deals_to_show = results.get("deals", [])
+            
+            if not deals_to_show and results.get("best_alternative"):
+                # Si no hay "Deals" (ofertas locas), mostramos la mejor opción encontrada de todas formas
+                best = results["best_alternative"]
+                # Le agregamos una marquita falsa o nota de que es la sugerencia
+                deals_to_show = [best]
+                
+            if deals_to_show:
+                 self.after(0, lambda: self.show_results_window(deals_to_show))
+
         except Exception as e:
             self.log_message(f"CRITICAL ERROR: {e}")
         finally:
+            self._stop_animation() # STOP
             self.after(0, lambda: self.btn_run.configure(state="normal", text="RUN SEARCH"))
+
+    def show_results_window(self, deals):
+        if not deals: return
+        DealResultsWindow(deals)
 
 if __name__ == "__main__":
     app = FlightMonitorGUI()
