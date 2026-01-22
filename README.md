@@ -8,10 +8,10 @@ Ideally suited for digital nomads, frequent travelers, and developers looking fo
 
 ---
 
-![GUI Screenshot](docs/gui_preview.png)
-*(Note: Placeholder for an actual screenshot of the GUI)*
+![GUI Screenshot](GUI.png)
 
-## ✨ Key Features
+
+## Key Features
 
 - **Automated Scanning**: Automatically searches for flights across extensive date ranges and multiple destination airports.
 - **Intelligent Deal Scoring**: Uses a statistical baseline to distinguish "normal" prices from "great deals" (e.g., detects distinct price drops relative to seasonal averages).
@@ -24,7 +24,7 @@ Ideally suited for digital nomads, frequent travelers, and developers looking fo
 - **Modern GUI**: A clean, dark-mode graphical interface built with `customtkinter` for easy configuration without touching code.
 - **Concurrency**: background threads ensure the UI remains responsive during long API search operations.
 
-## 🏗️ Architecture
+## Architecture
 
 The project follows a modular architecture designed for maintainability and extensibility:
 
@@ -37,7 +37,7 @@ The project follows a modular architecture designed for maintainability and exte
 | **`store.py`** | **Persistence**. Manages a SQLite database (`deals.db`) to store price history/baselines and prevent duplicate notifications for the same deal. |
 | **`notifier_whatsapp.py`** | **Notification**. Abstraction layer for Twilio API to send formatted messages with emojis and deep links. |
 
-## 🚀 Installation
+## Installation
 
 ### Prerequisites
 - Python 3.8+
@@ -77,7 +77,7 @@ The project follows a modular architecture designed for maintainability and exte
    TWILIO_FROM_NUMBER=whatsapp:+14155238886
    ```
 
-## ⚙️ Configuration
+## Configuration
 
 The system is "Configuration-Driven". While `config.yaml` stores all settings, the **GUI** is the recommended way to adjust them.
 
@@ -100,7 +100,7 @@ system:
   send_summary_if_no_deals: true # Send daily report even if no deals found
 ```
 
-## 🖥️ Usage
+## Usage
 
 ### 1. Run the Launcher
 ```bash
@@ -124,22 +124,5 @@ You will receive a WhatsApp message like this:
 > 📉 Ahorro: **15% vs Baseline**
 > 🔗 **[Ver en Google Flights]**
 
-## 🛡️ Best Practices & Limits
 
-- **Amadeus Test Environment**: The free tier has limited data access. You may not see all real-time flights. For production use, request Enterprise access.
-- **Rate Limiting**: The bot includes `time.sleep()` calls to respect API limits, but be careful not to spam requests in a loop.
-- **Security**: Never commit your `.env` file. It is included in `.gitignore` by default.
 
-## 🗺️ Roadmap
-
-- [ ] Support for Multi-City search.
-- [ ] Email notifications via SMTP.
-- [ ] Telegram Bot integration as an alternative to Twilio.
-- [ ] Cloud deployment (AWS Lambda / Docker support).
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-Built with ❤️ by [Your Name]
