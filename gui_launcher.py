@@ -70,6 +70,27 @@ class FlightMonitorGUI(ctk.CTk):
     """
     CONFIG_PATH = "config.yaml"
 
+    LOCATIONS = {
+        "Mexico": ["Whole Country (MX)", "Mexico City (MEX)", "Cancun (CUN)", "Guadalajara (GDL)", "Monterrey (MTY)", "Tijuana (TIJ)"],
+        "United States": ["Whole Country (US)", "New York (JFK)", "Miami (MIA)", "Los Angeles (LAX)", "Las Vegas (LAS)", "Orlando (MCO)"],
+        "Colombia": ["Whole Country (CO)", "Bogota (BOG)", "Medellin (MDE)", "Cartagena (CTG)"],
+        "Argentina": ["Whole Country (AR)", "Buenos Aires (EZE)"],
+        "Brazil": ["Whole Country (BR)", "Sao Paulo (GRU)", "Rio de Janeiro (GIG)"],
+        "Peru": ["Whole Country (PE)", "Lima (LIM)"],
+        "Chile": ["Whole Country (CL)", "Santiago (SCL)"],
+        "Ecuador": ["Whole Country (EC)", "Quito (UIO)", "Guayaquil (GYE)"],
+        "Costa Rica": ["Whole Country (CR)", "San Jose (SJO)"],
+        "Panama": ["Whole Country (PA)", "Panama City (PTY)"],
+        "Spain": ["Whole Country (ES)", "Madrid (MAD)", "Barcelona (BCN)"],
+        "France": ["Whole Country (FR)", "Paris (CDG)"],
+        "Italy": ["Whole Country (IT)", "Rome (FCO)"],
+        "Germany": ["Whole Country (DE)", "Frankfurt (FRA)"],
+        "United Kingdom": ["Whole Country (GB)", "London (LHR)"],
+        "Japan": ["Whole Country (JP)", "Tokyo (HND)"],
+        "Canada": ["Whole Country (CA)", "Toronto (YYZ)", "Vancouver (YVR)"],
+        "Custom / Other": []
+    }
+
     def __init__(self):
         super().__init__()
 
@@ -99,10 +120,25 @@ class FlightMonitorGUI(ctk.CTk):
             messagebox.showerror("Error", f"Error leyendo config: {e}")
             return {}
 
+    def _extract_code(self, raw_value):
+        """Extrae el código entre paréntesis si existe, o devuelve el valor raw en mayúsculas."""
+        # Check for (CODE) format
+        if "(" in raw_value and raw_value.endswith(")"):
+            try:
+                start = raw_value.rfind("(") + 1
+                end = raw_value.rfind(")")
+                return raw_value[start:end].strip().upper()
+            except:
+                pass
+        return raw_value.strip().upper()
+
     def save_config(self, show_msg=False):
         try:
-            self.config_data['travel']['origin_country'] = self.entry_origin.get().upper()
-            self.config_data['travel']['destination_country'] = self.entry_dest.get().upper()
+            origin_raw = self.combo_origin.get()
+            dest_raw = self.combo_dest.get()
+            
+            self.config_data['travel']['origin_country'] = self._extract_code(origin_raw)
+            self.config_data['travel']['destination_country'] = self._extract_code(dest_raw)
 
             today = datetime.now().date()
             start_date = self.date_start.get_date()
@@ -138,7 +174,7 @@ class FlightMonitorGUI(ctk.CTk):
             
             if show_msg:
                 messagebox.showinfo("Success", "Configuration saved successfully!")
-            self.log_message(f"Configuration saved. Range: {start_date} to {end_date}.")
+            self.log_message(f"Configuration saved. Origin: {self.config_data['travel']['origin_country']}, Dest: {self.config_data['travel']['destination_country']}")
 
         except ValueError as ve:
             messagebox.showerror("Validation Error", str(ve))
@@ -158,8 +194,14 @@ class FlightMonitorGUI(ctk.CTk):
         label_title.pack(pady=10)
 
         self._create_section_label("Travel Settings")
-        self.entry_origin = self._create_input_field("Origin (Code):", self.config_data.get('travel', {}).get('origin_country', ''))
-        self.entry_dest = self._create_input_field("Destination (Code):", self.config_data.get('travel', {}).get('destination_country', ''))
+        
+        # Origin (Hierarchical)
+        curr_origin = self.config_data.get('travel', {}).get('origin_country', '')
+        self.combo_origin = self._create_location_selector("Origin:", curr_origin)
+        
+        # Destination (Hierarchical)
+        curr_dest = self.config_data.get('travel', {}).get('destination_country', '')
+        self.combo_dest = self._create_location_selector("Destination:", curr_dest)
         
         dates_cfg = self.config_data.get('dates', {})
         today = datetime.now().date()
@@ -257,13 +299,62 @@ class FlightMonitorGUI(ctk.CTk):
         l = ctk.CTkLabel(self.left_frame, text=text, font=ctk.CTkFont(size=14, weight="bold"))
         l.pack(anchor="w", padx=10, pady=(15, 5))
 
-    def _create_input_field(self, label_text, default_value):
-        l = ctk.CTkLabel(self.left_frame, text=label_text)
-        l.pack(anchor="w", padx=10)
-        e = ctk.CTkEntry(self.left_frame)
-        e.insert(0, str(default_value))
-        e.pack(fill="x", padx=10, pady=(0, 10))
-        return e
+    def _create_location_selector(self, label_text, current_code):
+        """
+        Crea un selector jerárquico: País -> Ciudad.
+        """
+        wrapper = ctk.CTkFrame(self.left_frame, fg_color="transparent")
+        wrapper.pack(fill="x", padx=10, pady=(0, 10))
+        
+        ctk.CTkLabel(wrapper, text=label_text, font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", pady=(0, 2))
+        
+        # Determine initial Country and City display values
+        initial_country = "Custom / Other"
+        initial_city_val = current_code
+        
+        # Reverse lookup logic
+        found = False
+        if current_code:
+            for country, cities in self.LOCATIONS.items():
+                for city_str in cities:
+                    if f"({current_code})" in city_str:
+                        initial_country = country
+                        initial_city_val = city_str
+                        found = True
+                        break
+                if found: break
+        
+        # Country Combobox
+        # Frame for country row
+        f_country = ctk.CTkFrame(wrapper, fg_color="transparent")
+        f_country.pack(fill="x", pady=2)
+        ctk.CTkLabel(f_country, text="Country:", width=60).pack(side="left")
+        
+        combo_country = ctk.CTkComboBox(f_country, values=list(self.LOCATIONS.keys()))
+        combo_country.set(initial_country)
+        combo_country.pack(side="left", fill="x", expand=True)
+
+        # City Combobox
+        f_city = ctk.CTkFrame(wrapper, fg_color="transparent")
+        f_city.pack(fill="x", pady=2)
+        ctk.CTkLabel(f_city, text="City:", width=60).pack(side="left")
+        
+        combo_city = ctk.CTkComboBox(f_city, values=self.LOCATIONS.get(initial_country, []))
+        combo_city.set(initial_city_val)
+        combo_city.pack(side="left", fill="x", expand=True)
+        
+        # Callback to update cities
+        def on_country_change(choice):
+            cities = self.LOCATIONS.get(choice, [])
+            combo_city.configure(values=cities)
+            if cities:
+                combo_city.set(cities[0])
+            else:
+                combo_city.set("")
+                
+        combo_country.configure(command=on_country_change)
+        
+        return combo_city
 
     def update_budget_label(self, value):
         self.budget_label_ref.configure(text=f"Max Budget: {int(value)}")
