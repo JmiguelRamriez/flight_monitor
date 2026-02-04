@@ -28,7 +28,7 @@ def test_twilio():
     logger.info(f"To: {to_number}")
 
     if not account_sid or not auth_token:
-        logger.error("❌ Faltan credenciales en .env")
+        logger.error(" Faltan credenciales en .env")
         return
 
     url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
@@ -51,17 +51,17 @@ def test_twilio():
         response = requests.post(url, data=data, auth=(account_sid, auth_token))
         
         if response.status_code == 201:
-            logger.info(f"✅ Mensaje TEMPLATE enviado! SID: {response.json().get('sid')}")
+            logger.info(f" Mensaje TEMPLATE enviado! SID: {response.json().get('sid')}")
             print("\n¡ÉXITO! Mensaje de plantilla enviado. Revisa tu WhatsApp.")
         else:
-            logger.error(f"❌ Falló Twilio Template: {response.status_code}")
+            logger.error(f" Falló Twilio Template: {response.status_code}")
             # Escribir error completo a archivo
             with open("twilio_error.log", "w", encoding="utf-8") as f:
                 f.write(response.text)
             print(f"\nFALLÓ. Revisa twilio_error.log para detalles.")
             
     except Exception as e:
-        logger.error(f"❌ Error de conexión: {e}")
+        logger.error(f" Error de conexión: {e}")
         with open("twilio_error.log", "w", encoding="utf-8") as f:
             f.write(str(e))
 

@@ -181,13 +181,25 @@ class AmadeusClient:
         
         # Generamos (max_queries_per_run) fechas de prueba
         max_queries = config_sys["max_queries_per_run"]
-        if window_days <= 0:
+        if window_days <= 0 and not config_dates.get("exact_dates_mode"):
+             # Only warn if NOT in exact mode (since exact mode can have window_days ~ 0 or defined differently)
             logger.warning("Ventana de viaje inválida.")
             return []
 
-        # Intentamos distribuir las queries entre los destinos
-        # Si hay 3 destinos y 20 queries -> ~6 queries por destino.
-        queries_per_dest = max(1, max_queries // len(dest_airports))
+        # Check for EXACT DATES MODE
+        exact_mode = config_dates.get("exact_dates_mode", False)
+        specific_start = config_dates.get("specific_start")
+        specific_end = config_dates.get("specific_end")
+
+        if exact_mode and specific_start and specific_end:
+             # run ONCE per destination with EXACT dates
+             logger.info(f"Running EXACT DATE search: {specific_start} to {specific_end}")
+             queries_per_dest = 1
+        else:
+            # Random Logic
+            # Intentamos distribuir las queries entre los destinos
+            queries_per_dest = max(1, max_queries // len(dest_airports))
+        
         total_queries = queries_per_dest * len(dest_airports)
         current_query = 0
         
@@ -197,17 +209,21 @@ class AmadeusClient:
                 progress_pct = (current_query / total_queries) * 100
                 logger.info(f"[PROGRESS] {progress_pct:.0f}%")
 
-                # Elegir día random de salida
-                rand_day = random.randint(start_delta, end_delta)
-                depart_date = today + timedelta(days=rand_day)
-                depart_str = depart_date.strftime("%Y-%m-%d")
-                
-                # Elegir duración random (o fixed si min=max)
-                min_nights = config_dates["min_nights"]
-                max_nights = config_dates["max_nights"]
-                duration = random.randint(min_nights, max_nights)
-                return_date = depart_date + timedelta(days=duration)
-                return_str = return_date.strftime("%Y-%m-%d")
+                if exact_mode and specific_start and specific_end:
+                     depart_str = specific_start
+                     return_str = specific_end
+                else:
+                    # Elegir día random de salida
+                    rand_day = random.randint(start_delta, end_delta)
+                    depart_date = today + timedelta(days=rand_day)
+                    depart_str = depart_date.strftime("%Y-%m-%d")
+                    
+                    # Elegir duración random
+                    min_nights = config_dates["min_nights"]
+                    max_nights = config_dates["max_nights"]
+                    duration = random.randint(min_nights, max_nights)
+                    return_date = depart_date + timedelta(days=duration)
+                    return_str = return_date.strftime("%Y-%m-%d")
                 
                 # Comprobar aerolíneas
                 included_airlines = config_filters["airlines"].get("allowed", [])

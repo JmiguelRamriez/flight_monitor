@@ -64,13 +64,13 @@ class WhatsAppNotifier:
         msg_body = (
             f"✈️ *NUEVA OFERTA DE VUELO*\n"
             f"{confidence_marker}\n\n"
-            f"📍 Ruta: {deal.get('cityCodeFrom')} ➡️ {deal.get('cityCodeTo')}\n"
-            f"📅 Fecha: {date_str}\n"
-            f"💰 Precio: ${price} {self.config.get('budget', {}).get('currency')}\n"
-            f"📉 Ahorro: {percentage_off:.1f}% vs Baseline (${baseline:.0f})\n"
-            f"🛑 Segmentos: {segments_count}\n"
-            f"✈️ Aerolíneas: {airlines}\n\n"
-            f"🔗 Ver Oferta: {deal.get('deep_link')}"
+            f" Ruta: {deal.get('cityCodeFrom')} -> {deal.get('cityCodeTo')}\n"
+            f" Fecha: {date_str}\n"
+            f" Precio: ${price} {self.config.get('budget', {}).get('currency')}\n"
+            f" Ahorro: {percentage_off:.1f}% vs Baseline (${baseline:.0f})\n"
+            f" Segmentos: {segments_count}\n"
+            f" Aerolíneas: {airlines}\n\n"
+            f" Ver Oferta: {deal.get('deep_link')}"
         )
         
         if self.is_mock:

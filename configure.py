@@ -14,7 +14,7 @@ def load_config():
 def save_config(config):
     with open(CONFIG_PATH, 'w') as f:
         yaml.dump(config, f, default_flow_style=False)
-    print("✅ Configuración guardada exitosamente.")
+    print(" Configuración guardada exitosamente.")
 
 def main():
     print("--- Configuración de Monitor de Vuelos ---")
@@ -28,13 +28,13 @@ def main():
     
     if new_dest:
         if len(new_dest) < 2:
-            print("⚠️ El código debe tener al menos 2 letras (ej. MX, US) o 3 para ciudades (ej. TYO).")
+            print(" El código debe tener al menos 2 letras (ej. MX, US) o 3 para ciudades (ej. TYO).")
         else:
             config['travel']['destination_country'] = new_dest
             # Resetear a default si se cambió
             config['travel']['destination_airports_limit'] = 6 
             save_config(config)
-            print(f"🎯 Destino actualizado a: {new_dest}")
+            print(f" Destino actualizado a: {new_dest}")
     else:
         print("Sin cambios.")
 

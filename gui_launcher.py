@@ -104,8 +104,14 @@ class DealResultsWindow(ctk.CTkToplevel):
         info_frame.pack(fill="x", padx=15, pady=5)
         
         price = deal.get("price")
-        ts = deal.get("dTime")
-        date_str = datetime.fromtimestamp(ts).strftime('%d %b %Y') if ts else "N/A"
+        
+        # Dates
+        ts_dep = deal.get("dTime")
+        ts_ret = deal.get("aTime")
+        
+        fmt = '%d %b'
+        date_dep_str = datetime.fromtimestamp(ts_dep).strftime(fmt) if ts_dep else "N/A"
+        date_ret_str = datetime.fromtimestamp(ts_ret).strftime(fmt) if ts_ret else "N/A"
         
         # Price (Large)
         ctk.CTkLabel(info_frame, text=f"${price:,}", font=ctk.CTkFont(size=24, weight="bold"), text_color="#4ade80").pack(side="left")
@@ -113,43 +119,48 @@ class DealResultsWindow(ctk.CTkToplevel):
         # Date & Airline (Right)
         right_info = ctk.CTkFrame(info_frame, fg_color="transparent")
         right_info.pack(side="right")
-        ctk.CTkLabel(right_info, text=f"📅 {date_str}", font=ctk.CTkFont(size=14)).pack(anchor="e")
+        
+        # Display Dates (English)
+        ctk.CTkLabel(right_info, text=f"DEPART: {date_dep_str}", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="e")
+        if ts_ret:
+             ctk.CTkLabel(right_info, text=f"RETURN: {date_ret_str}", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="e")
+        
         airlines = ", ".join(deal.get("airlines", []))[:20] # Truncate if long
-        ctk.CTkLabel(right_info, text=f"🛩️ {airlines}", font=ctk.CTkFont(size=12, text_color="gray")).pack(anchor="e")
+        ctk.CTkLabel(right_info, text=f"🛩️ {airlines}", font=ctk.CTkFont(size=12), text_color="gray").pack(anchor="e")
 
-        # Button Logic: Try to use existing link, or regenerate it if missing
-        link = deal.get("deep_link") or deal.get("backup_link")
+        # Button Logic: PRIORITIZE SKYSCANNER (backup_link)
+        link = deal.get("backup_link") or deal.get("deep_link")
         
         if not link and deal.get("cityCodeFrom") and deal.get("cityCodeTo") and deal.get("dTime"):
-            # Fallback: Regenerate Google Flights Link
+            # Fallback: Regenerate Skyscanner Link (YYMMDD format)
             try:
-                origin = deal["cityCodeFrom"]
-                dest = deal["cityCodeTo"]
+                origin = deal["cityCodeFrom"].lower()
+                dest = deal["cityCodeTo"].lower()
                 dep_dt = datetime.fromtimestamp(deal["dTime"])
-                dep_str = dep_dt.strftime("%Y-%m-%d")
+                sky_dep = dep_dt.strftime("%y%m%d")
+                sky_ret = ""
                 
-                query = f"Flights from {origin} to {dest} on {dep_str}"
-                
-                # Check for return
                 if deal.get("aTime") and deal["aTime"] > deal["dTime"]:
                      ret_dt = datetime.fromtimestamp(deal["aTime"])
-                     # Basic check to ensure it's a reasonable return date (e.g. not same day/weird)
                      if ret_dt > dep_dt:
-                        ret_str = ret_dt.strftime("%Y-%m-%d")
-                        query += f" returning {ret_str}"
+                        sky_ret = ret_dt.strftime("%y%m%d")
                 
-                link = f"https://www.google.com/travel/flights?q={query.replace(' ', '+')}"
+                link = f"https://www.skyscanner.com.mx/transport/vuelos/{origin}/{dest}/{sky_dep}/{sky_ret}"
             except Exception:
                 link = None
 
         if link:
-             btn_text = "Ver Oferta en Google Flights ↗️"
+             btn_text = "🔗 View Deal (Skyscanner)"
              state = "normal"
+             fg_color = "#2563eb"
+             hover_color = "#1d4ed8"
         else:
-             btn_text = "Ver Oferta (Link no disp.)"
+             btn_text = "Link Not Available"
              state = "disabled"
+             fg_color = "#4b5563"
+             hover_color = "#4b5563"
              
-        btn = ctk.CTkButton(card, text=btn_text, fg_color="#2563eb", hover_color="#1d4ed8", 
+        btn = ctk.CTkButton(card, text=btn_text, fg_color=fg_color, hover_color=hover_color, 
                             font=ctk.CTkFont(weight="bold"),
                             state=state,
                             command=lambda l=link: self._open_link(l) if l else None)
@@ -161,7 +172,7 @@ class DealResultsWindow(ctk.CTkToplevel):
 
 class FlightMonitorGUI(ctk.CTk):
     """
-    Clase principal de la interfaz gráfica del Monitor de Vuelos.
+    Main GUI Class.
     """
     CONFIG_PATH = "config.yaml"
 
@@ -192,10 +203,10 @@ class FlightMonitorGUI(ctk.CTk):
         self.title("Flight Monitor Launcher - Enhanced")
         self.geometry("1100x750") 
 
-        # Cargar configuración inicial
+        # Load initial config
         self.config_data = self.load_config()
 
-        # Layout principal (2 columnas)
+        # Main Layout
         self.grid_columnconfigure(0, weight=1) # Settings
         self.grid_columnconfigure(1, weight=2) # Results & Logs
         self.grid_rowconfigure(0, weight=1)
@@ -212,12 +223,11 @@ class FlightMonitorGUI(ctk.CTk):
             with open(self.CONFIG_PATH, 'r') as f:
                 return yaml.safe_load(f)
         except Exception as e:
-            messagebox.showerror("Error", f"Error leyendo config: {e}")
+            messagebox.showerror("Error", f"Error reading config: {e}")
             return {}
 
     def _extract_code(self, raw_value):
-        """Extrae el código entre paréntesis si existe, o devuelve el valor raw en mayúsculas."""
-        # Check for (CODE) format
+        """Extracts code between parentheses."""
         if "(" in raw_value and raw_value.endswith(")"):
             try:
                 start = raw_value.rfind("(") + 1
@@ -236,17 +246,22 @@ class FlightMonitorGUI(ctk.CTk):
             self.config_data['travel']['destination_country'] = self._extract_code(dest_raw)
 
             today = datetime.now().date()
-            start_date = self.date_start.get_date()
-            end_date = self.date_end.get_date()
+            start_date_obj = self.date_start.get_date()
+            end_date_obj = self.date_end.get_date()
             
-            if start_date < today:
-                raise ValueError("Start date cannot be in the past.")
-            if end_date <= start_date:
-                raise ValueError("End date must be after start date.")
+            if start_date_obj < today:
+                raise ValueError("Departure date cannot be in the past.")
+            if end_date_obj <= start_date_obj:
+                raise ValueError("Return date must be after departure date.")
 
-            days_start = (start_date - today).days
-            days_end = (end_date - today).days
+            # SAVE SPECIFIC DATES LOGIC
+            self.config_data['dates']['exact_dates_mode'] = True
+            self.config_data['dates']['specific_start'] = start_date_obj.strftime("%Y-%m-%d")
+            self.config_data['dates']['specific_end'] = end_date_obj.strftime("%Y-%m-%d")
 
+            # Fallback for old logic (window) - Keeping it consistent just in case
+            days_start = (start_date_obj - today).days
+            days_end = (end_date_obj - today).days
             self.config_data['dates']['travel_window_start'] = days_start
             self.config_data['dates']['travel_window_end'] = days_end
 
@@ -270,6 +285,7 @@ class FlightMonitorGUI(ctk.CTk):
             if show_msg:
                 messagebox.showinfo("Success", "Configuration saved successfully!")
             self.log_message(f"Configuration saved. Origin: {self.config_data['travel']['origin_country']}, Dest: {self.config_data['travel']['destination_country']}")
+            self.log_message(f"Searching specific dates: {self.config_data['dates']['specific_start']} to {self.config_data['dates']['specific_end']}")
 
         except ValueError as ve:
             messagebox.showerror("Validation Error", str(ve))
@@ -285,8 +301,6 @@ class FlightMonitorGUI(ctk.CTk):
         self.left_frame = ctk.CTkScrollableFrame(self, label_text="Configuration", label_font=ctk.CTkFont(size=20, weight="bold"))
         self.left_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
-        # label_title removed as it's now part of the frame header
-
         self._create_section_label("Travel Settings")
         
         # Origin (Hierarchical)
@@ -297,16 +311,33 @@ class FlightMonitorGUI(ctk.CTk):
         curr_dest = self.config_data.get('travel', {}).get('destination_country', '')
         self.combo_dest = self._create_location_selector("Destination:", curr_dest)
         
+        # Load saved dates if available, else default
         dates_cfg = self.config_data.get('dates', {})
         today = datetime.now().date()
-        d_start = today + timedelta(days=dates_cfg.get('travel_window_start', 30))
-        d_end = today + timedelta(days=dates_cfg.get('travel_window_end', 150))
+        
+        # Default to specific dates if exist
+        if dates_cfg.get('specific_start'):
+             try:
+                 d_start = datetime.strptime(dates_cfg['specific_start'], "%Y-%m-%d").date()
+             except:
+                 d_start = today + timedelta(days=30)
+        else:
+            d_start = today + timedelta(days=30)
 
-        ctk.CTkLabel(self.left_frame, text="Start Date:").pack(anchor="w", padx=10)
+        if dates_cfg.get('specific_end'):
+             try:
+                 d_end = datetime.strptime(dates_cfg['specific_end'], "%Y-%m-%d").date()
+             except:
+                 d_end = today + timedelta(days=37)
+        else:
+            d_end = today + timedelta(days=37)
+
+
+        ctk.CTkLabel(self.left_frame, text="Departure Date:").pack(anchor="w", padx=10)
         self.date_start = DateEntry(self.left_frame, width=12, background='darkblue', foreground='white', borderwidth=2, year=d_start.year, month=d_start.month, day=d_start.day, date_pattern='y-mm-dd')
         self.date_start.pack(fill="x", padx=10, pady=(0, 10))
 
-        ctk.CTkLabel(self.left_frame, text="End Date:").pack(anchor="w", padx=10)
+        ctk.CTkLabel(self.left_frame, text="Return Date:").pack(anchor="w", padx=10)
         self.date_end = DateEntry(self.left_frame, width=12, background='darkblue', foreground='white', borderwidth=2, year=d_end.year, month=d_end.month, day=d_end.day, date_pattern='y-mm-dd')
         self.date_end.pack(fill="x", padx=10, pady=(0, 10))
 
